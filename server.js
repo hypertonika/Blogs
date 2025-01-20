@@ -1,5 +1,5 @@
 const express = require('express');
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 
 const app = express();
 const PORT = 3000;
@@ -8,102 +8,144 @@ app.use(express.static('static'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/user?:name', (req, res) => {
-    res.send(`${req.query.name}`)
-})
-
-const MongoClient = require("mongodb").MongoClient;
-const dbClient = new MongoClient("mongodb://127.0.0.1:27017/");
-const collection = dbClient.db("blogs").collection("posts");
+const MongoClient = require('mongodb').MongoClient;
+const dbClient = new MongoClient('mongodb://127.0.0.1:27017/');
+const collection = dbClient.db('blogs').collection('posts');
 
 app.set('view engine', 'ejs');
 app.set('views', './views');
 
-async function run() {
-    try {
+// Middleware for error handling
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// POST /blogs: Create a new blog post
+app.post(
+    '/blogs',
+    asyncHandler(async (req, res) => {
+        const { title, body, author = 'Anonymous' } = req.body;
+
+        // Validation
+        if (!title || !body) {
+            return res.status(400).json({ error: 'Title and body are required.' });
+        }
+
+        const newBlog = {
+            title,
+            body,
+            author,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
         await dbClient.connect();
-       
-        const res = await collection.find({}).toArray();
-        console.log(res)
-        console.log("Подключение установлено");
-    } catch(err) {
-        console.log(err);
-    } finally {
+        const result = await collection.insertOne(newBlog);
         await dbClient.close();
-        console.log("Подключение закрыто");
-    }
-}
-run().catch(console.log);
 
-app.get("/blogs", async (req, res) => {
-    let response = ""
-    await dbClient.connect();
-    response = await collection.find({}).toArray();
-    res.send(response)
-    await dbClient.close();
-})
+        res.status(201).json(result.ops[0]);
+    })
+);
 
-app.get("/blogs/:id", async (req, res) => {
-    let post = ""
-    console.log(req.params.id)
-    await dbClient.connect();
+// GET /blogs: Retrieve all blog posts
+app.get(
+    '/blogs',
+    asyncHandler(async (req, res) => {
+        await dbClient.connect();
+        const blogs = await collection.find({}).toArray();
+        await dbClient.close();
 
-    try {
-        post = await collection.find({_id: new ObjectId(req.params.id)}).toArray();
-        post = post[0]
-        res.render('post', { post });
-    } catch (err) {
-        res.send("error");
-    }
+        res.json(blogs);
+    })
+);
 
-    await dbClient.close();
-})
+// GET /blogs/:id: Retrieve a single blog post by its ID
+app.get(
+    '/blogs/:id',
+    asyncHandler(async (req, res) => {
+        const { id } = req.params;
 
-app.post("/blogs", async (req, res) => {
-    console.log(req.body);
-    await dbClient.connect();
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid blog ID.' });
+        }
 
-    try {
-        await collection.insertOne(req.body);
-    } catch (err) {
-        res.end("error");
-    }
+        await dbClient.connect();
+        const blog = await collection.findOne({ _id: new ObjectId(id) });
+        await dbClient.close();
 
-    await dbClient.close();
-    res.end(JSON.stringify(req.body));
-})
+        if (!blog) {
+            return res.status(404).json({ error: 'Blog not found.' });
+        }
 
-app.delete("/blogs/:id", async (req, res) => {
-    await dbClient.connect();
-    let id = req.params.id
+        res.json(blog);
+    })
+);
 
-    try {
-        await collection.deleteOne({_id: new ObjectId(id)});
-        console.log(`[DELETE /blogs/${id}]: Blog post deleted successfully.`);
-    } catch (err) {
-        console.error(`[DELETE /blogs/${id} Error]:`, err);
-        res.send("error");
-    }
+// PUT /blogs/:id: Update a blog post by its ID
+app.put(
+    '/blogs/:id',
+    asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const { title, body, author } = req.body;
 
-    await dbClient.close();
-})
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid blog ID.' });
+        }
 
-app.put("/blogs/:id", async (req, res) => {
-    let id = req.params.id
-    await dbClient.connect();
+        // Validation
+        if (!title || !body) {
+            return res.status(400).json({ error: 'Title and body are required.' });
+        }
 
-    try {
-        await collection.updateOne({_id: new ObjectId(id)}, { $set: req.body } );
-        console.log(`[PUT /blogs/${id}]: Blog post updated successfully.`);
-    } catch (err) {
-        console.error(`[PUT /blogs/${id} Error]:`, err);
-        res.end("error");
-    }
+        const updatedBlog = {
+            title,
+            body,
+            author: author || 'Anonymous',
+            updatedAt: new Date(),
+        };
 
-    await dbClient.close();
-    res.end(JSON.stringify(req.body));
-})
+        await dbClient.connect();
+        const result = await collection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: updatedBlog }
+        );
+        await dbClient.close();
 
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Blog not found.' });
+        }
+
+        res.json({ message: 'Blog updated successfully.' });
+    })
+);
+
+// DELETE /blogs/:id: Delete a blog post by its ID
+app.delete(
+    '/blogs/:id',
+    asyncHandler(async (req, res) => {
+        const { id } = req.params;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid blog ID.' });
+        }
+
+        await dbClient.connect();
+        const result = await collection.deleteOne({ _id: new ObjectId(id) });
+        await dbClient.close();
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: 'Blog not found.' });
+        }
+
+        res.json({ message: 'Blog deleted successfully.' });
+    })
+);
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Internal Server Error' });
+});
+
+// Start server
 app.listen(PORT, () => {
-    console.log(`http://localhost:${PORT}`);
-})
+    console.log(`Server running at http://localhost:${PORT}`);
+});
