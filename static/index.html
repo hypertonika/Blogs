@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <link rel="stylesheet" href="/style.css" />
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Blog Management</title>
@@ -18,7 +17,24 @@
       <input type="text" id="title" name="title" required />
       <label for="content">Content:</label>
       <textarea id="content" name="content" required></textarea>
+      <label for="author">Author:</label>
+      <input type="text" id="author" name="author" placeholder="Anonymous" />
       <button type="submit">Add Blog</button>
+    </form>
+
+    <hr />
+
+    <!-- Form to Update Blog -->
+    <form id="updateBlogForm" style="display:none;">
+      <h2>Update Blog</h2>
+      <input type="hidden" id="updateId" />
+      <label for="updateTitle">Title:</label>
+      <input type="text" id="updateTitle" required />
+      <label for="updateContent">Content:</label>
+      <textarea id="updateContent" required></textarea>
+      <label for="updateAuthor">Author:</label>
+      <input type="text" id="updateAuthor" placeholder="Anonymous" />
+      <button type="submit">Update Blog</button>
     </form>
 
     <hr />

@@ -12,13 +12,11 @@ const MongoClient = require('mongodb').MongoClient;
 const dbClient = new MongoClient('mongodb://127.0.0.1:27017/');
 const collection = dbClient.db('blogs').collection('posts');
 
-app.set('view engine', 'ejs');
-app.set('views', './views');
 
-// Middleware for error handling
+//error handling
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-// POST /blogs: Create a new blog post
+// POST
 app.post(
     '/blogs',
     asyncHandler(async (req, res) => {
@@ -41,11 +39,19 @@ app.post(
         const result = await collection.insertOne(newBlog);
         await dbClient.close();
 
-        res.status(201).json(result.ops[0]);
+        res.status(201).json({
+            id: result.insertedId,
+            title: newBlog.title,
+            body: newBlog.body,
+            author: newBlog.author,
+            createdAt: newBlog.createdAt,
+            updatedAt: newBlog.updatedAt,
+        });
     })
 );
 
-// GET /blogs: Retrieve all blog posts
+
+// GET all
 app.get(
     '/blogs',
     asyncHandler(async (req, res) => {
@@ -57,7 +63,7 @@ app.get(
     })
 );
 
-// GET /blogs/:id: Retrieve a single blog post by its ID
+// GET single
 app.get(
     '/blogs/:id',
     asyncHandler(async (req, res) => {
@@ -79,7 +85,7 @@ app.get(
     })
 );
 
-// PUT /blogs/:id: Update a blog post by its ID
+// PUT
 app.put(
     '/blogs/:id',
     asyncHandler(async (req, res) => {
@@ -117,7 +123,7 @@ app.put(
     })
 );
 
-// DELETE /blogs/:id: Delete a blog post by its ID
+// DELETE 
 app.delete(
     '/blogs/:id',
     asyncHandler(async (req, res) => {
